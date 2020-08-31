@@ -72,14 +72,18 @@ class Engine:
                         output=True)
 
         print("stream opened with: ", "format=", p.get_format_from_width(wf.getsampwidth()), ", channels=", wf.getnchannels(),  ", rate=", wf.getframerate())
-        # while not keyboard.is_pressed('q'):
-        #     if keyboard.is_pressed('a'):
-        #         self.play_note(stream, wf, CHUNK)
         current_index = 0
-        print("nsamples: ", nsamples)
-        print("len(audio_arr): ", len(audio_arr))
-        while current_index < len(audio_arr):
-            current_index = self.processing_block(stream, audio_arr, current_index, 512)
+        while not keyboard.is_pressed('q'):
+            if keyboard.is_pressed('a'):
+                current_index = self.processing_block(stream, audio_arr, current_index, 64)
+            else:
+                current_index = 0
+        # current_index = 0
+        # print("nsamples: ", nsamples)
+        # print("len(audio_arr): ", len(audio_arr))
+        # while current_index < len(audio_arr):
+        #     current_index = self.processing_block(stream, audio_arr, current_index, 512)
+
 
         print(audio_arr)
         # print(len(arr))
