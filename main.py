@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import keyboard
 
 class Engine:
+    def __init__(self):
+        self.recording = []
     def play_note_wf(self, stream, wf, CHUNK):
         print("press")
         start_time = time.time()
@@ -28,14 +30,26 @@ class Engine:
             Returns:
                 end_index: long containing last sample played
         """
+        #pre-processing
         end_index = min(len(loaded_wav), start_index + chunk_size) # exclusive upper limit
-        for i in range(start_index, end_index):
+        adsr = [1 * 44100, 0, 0, 0, 0 , 0] # ENVELOPE: [attack time, decay time, sustain amplitude, release time]
+        attack_slope = 1.0 / float(adsr[0])
+        buffer = np.copy(loaded_wav[start_index : end_index])
+        #process buffer
+        # print("length of buffer: ", len(buffer))
+        for i in range(0, len(buffer)):
             #TODO: sample processing here
-            pass
-        stream.write(loaded_wav[start_index: end_index])
+            #Attack
+            if start_index < adsr[0]:
+                # print("before: ", buffer[i], ", before float: ", float(buffer[i]), " attack_slope: ", attack_slope)
+                buffer[i] = int(round(float(buffer[i]) * attack_slope * start_index))
+                # print("after: ", buffer[i])
+        #stream buffer
+        stream.write(buffer)
+        # self.recording.append(buffer.tolist())
         return end_index
         
-    def main(self):
+    def start(self):
         CHUNK = 1024
         p = pyaudio.PyAudio()
         # stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
@@ -51,7 +65,7 @@ class Engine:
         # arr = (np.sin(2*np.pi*np.arange(fs*duration)*f/fs)).astype(np.float32)
 
         # read wavefile
-        wf = wave.open("note.wav", 'rb')
+        wf = wave.open("note_signed_16bit.wav", 'rb')
 
         # for paFloat32 sample values must be in range [-1.0, 1.0]
         # stream = p.open(format=pyaudio.paFloat32,
@@ -71,11 +85,14 @@ class Engine:
                         rate=wf.getframerate(),
                         output=True)
 
-        print("stream opened with: ", "format=", p.get_format_from_width(wf.getsampwidth()), ", channels=", wf.getnchannels(),  ", rate=", wf.getframerate())
+        print("stream opened with: ",
+            "format=", p.get_format_from_width(wf.getsampwidth()),
+            ", channels=", wf.getnchannels(),
+            ", rate=", wf.getframerate())
         current_index = 0
         while not keyboard.is_pressed('q'):
             if keyboard.is_pressed('a'):
-                current_index = self.processing_block(stream, audio_arr, current_index, 64)
+                current_index = self.processing_block(stream, audio_arr, current_index, 128)
             else:
                 current_index = 0
         # current_index = 0
@@ -85,10 +102,12 @@ class Engine:
         #     current_index = self.processing_block(stream, audio_arr, current_index, 512)
 
 
-        print(audio_arr)
+        # print(audio_arr)
         # print(len(arr))
-        plt.plot(audio_arr)
-        plt.show()
+        # plt.plot(audio_arr)
+        # print(self.recording)
+        # plt.plot(self.recording)
+        # plt.show()
         # stream.write(arr * volume)
         print("closing stream")
         stream.stop_stream()
@@ -98,8 +117,5 @@ class Engine:
         print("Finished.")
 
 if __name__ == "__main__":
-    # print("starting")
-    # while True:
-    #     pass
     engine = Engine()
-    engine.main()
+    engine.start()
