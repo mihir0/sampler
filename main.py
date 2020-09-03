@@ -6,9 +6,29 @@ import math
 import matplotlib.pyplot as plt
 import keyboard
 
-class Engine:
+class Sampler:
     def __init__(self):
         self.recording = []
+        self.samples = {} #key: String, value: loaded sample (numpy array)
+    def load(self, path_map):
+        """
+            path_map (Python Dict)
+                key: String keyname
+                value: String path_to_wav_file
+                example: {"a":"c1.wav"}
+        """
+        for key in path_map:
+            # read wavefile by loading into numpy array
+            wf = wave.open(path_map[key], 'rb')
+            nframes = wf.getnframes()
+            audio = wf.readframes(nframes)
+            samplewidth = wf.getsampwidth()
+            nsamples = nframes * 1
+            channels = wf.getnchannels()
+            audio_arr = np.frombuffer(audio, dtype=np.int8)
+            print("loaded ", path_map[key], " nframes=", nframes, " nsamples=", nsamples, " samplewidth=", samplewidth, " channels=", channels)
+            self.samples[key] = audio_arr
+        print("self.samples = ", self.samples)
     def play_note_wf(self, stream, wf, CHUNK):
         print("press")
         start_time = time.time()
@@ -18,7 +38,6 @@ class Engine:
             data = wf.readframes(CHUNK)
         end_time = time.time()
         print(end_time - start_time)
-
     
     def processing_block(self, stream, loaded_wav, start_index, chunk_size):
         """
@@ -32,21 +51,20 @@ class Engine:
         """
         #pre-processing
         end_index = min(len(loaded_wav), start_index + chunk_size) # exclusive upper limit
-        adsr = [1 * 44100, 0, 0, 0, 0 , 0] # ENVELOPE: [attack time, decay time, sustain amplitude, release time]
-        attack_slope = 1.0 / float(adsr[0])
+        adsr = [.01 * 44100.0, 0, 0, 0, 0 , 0] # ENVELOPE: [attack time, decay time, sustain amplitude, release time]
+        attack_slope = 1.00 / float(adsr[0])
         buffer = np.copy(loaded_wav[start_index : end_index])
         #process buffer
         # print("length of buffer: ", len(buffer))
         for i in range(0, len(buffer)):
-            #TODO: sample processing here
             #Attack
             if start_index < adsr[0]:
-                # print("before: ", buffer[i], ", before float: ", float(buffer[i]), " attack_slope: ", attack_slope)
-                buffer[i] = int(round(float(buffer[i]) * attack_slope * start_index))
-                # print("after: ", buffer[i])
+                buffer[i] = int(round(float(buffer[i]) * attack_slope * (i + start_index)))
+        # if len(buffer) > 0:
+        # print("buffer: ", buffer)
         #stream buffer
         stream.write(buffer)
-        # self.recording.append(buffer.tolist())
+        self.recording.append(buffer.tolist())
         return end_index
         
     def start(self):
@@ -91,10 +109,15 @@ class Engine:
             ", rate=", wf.getframerate())
         current_index = 0
         while not keyboard.is_pressed('q'):
-            if keyboard.is_pressed('a'):
-                current_index = self.processing_block(stream, audio_arr, current_index, 128)
-            else:
-                current_index = 0
+            # if keyboard.is_pressed('a'):
+            #     current_index = self.processing_block(stream, audio_arr, current_index, 128)
+            # else:
+            #     current_index = 0
+            for key in self.samples:
+                if keyboard.is_pressed(key):
+                    current_index = self.processing_block(stream, self.samples[key], current_index, 128)
+                else:
+                    current_index = 0
         # current_index = 0
         # print("nsamples: ", nsamples)
         # print("len(audio_arr): ", len(audio_arr))
@@ -105,10 +128,14 @@ class Engine:
         # print(audio_arr)
         # print(len(arr))
         # plt.plot(audio_arr)
-        # print(self.recording)
-        # plt.plot(self.recording)
-        # plt.show()
+        recording = [item for sublist in self.recording for item in sublist]
+        print("recording size: ", len(recording))
+        # print(recording)
+        plt.plot(recording)
+        plt.show()
         # stream.write(arr * volume)
+        print("playing recording...")
+        stream.write(np.array(recording, dtype=np.int8))
         print("closing stream")
         stream.stop_stream()
         stream.close()
@@ -117,5 +144,7 @@ class Engine:
         print("Finished.")
 
 if __name__ == "__main__":
-    engine = Engine()
-    engine.start()
+    sampler = Sampler()
+    # sampler.load({"a": "note.wav", "s": "note2.wav"})
+    sampler.load({"a":"note.wav", "s":"note2.wav"})
+    sampler.start()
