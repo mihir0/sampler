@@ -90,7 +90,7 @@ class Sampler:
         # arr = (np.sin(2*np.pi*np.arange(fs*duration)*f/fs)).astype(np.float32)
 
         # read wavefile
-        wf = wave.open("note_signed_16bit.wav", 'rb')
+        wf = wave.open("note.wav", 'rb')
 
         # for paFloat32 sample values must be in range [-1.0, 1.0]
         # stream = p.open(format=pyaudio.paFloat32,
