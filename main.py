@@ -11,6 +11,8 @@ class Sampler:
         self.recording = []
         self.samples = {} #key: String, value: loaded sample (numpy array)
         self.chunk_size = 64 # number of samples to process/stream at once
+        self.sample_rate = None # set in start method
+        self.output_device_index = 4
     def load(self, path_map):
         """
             path_map (Python Dict)
@@ -51,10 +53,9 @@ class Sampler:
                 end_index: long containing last sample played
                 buffer: rendered samples for the wav file
         """
-        # sum_of_notes = np.zeros(chunk_size)
         #pre-processing
         end_index = min(len(loaded_wav), start_index + chunk_size) # exclusive upper limit
-        adsr = [.01 * 44100.0, 0, 0, 0, 0 , 0] # ENVELOPE: [attack time, decay time, sustain amplitude, release time]
+        adsr = [.01 * float(self.sample_rate), 0, 0, 0, 0, 0] # ENVELOPE: [attack time, decay time, sustain amplitude, release time]
         attack_slope = 1.00 / float(adsr[0])
         buffer = np.copy(loaded_wav[start_index : end_index])
         #process buffer
@@ -65,49 +66,42 @@ class Sampler:
             # if start_index < adsr[0]:
             #     buffer[i] = int(round(float(buffer[i]) * attack_slope * (i + start_index)))
             # buffer[i] = int(round(.5 * buffer[i])) #reduce volume
-        # print("buffer: ", buffer)
-        # sum_of_notes = np.add(sum_of_notes, buffer)
-        #stream buffer
-        # stream.write(buffer)
-        # stream.write(sum_of_notes)
-
         # self.recording.append(buffer.tolist())
         return end_index, buffer
         
     def start(self):
-        CHUNK = 1024
         p = pyaudio.PyAudio()
-        # stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
-        #                 channels=wf.getnchannels(),
-        #                 rate=wf.getframerate(),
-        #                 output=True)
-        volume = 1.0     # range [0.0, 1.0]
-        fs = 44100       # sampling rate, Hz, must be integer
-        duration = 5.0   # in seconds, may be float
-        f = 440.0        # sine frequency, Hz, may be float
-
-        # generate samples, note conversion to float32 array
-        # arr = (np.sin(2*np.pi*np.arange(fs*duration)*f/fs)).astype(np.float32)
+        #print host api info
+        info = p.get_host_api_info_by_index(0)
+        print(info)
+        numdevices = info.get('deviceCount')
+        for i in range(0, numdevices):
+            print("Input Device id ", i, " - ", p.get_device_info_by_host_api_device_index(0, i))
+        # set sample rate
+        self.sample_rate = p.get_device_info_by_host_api_device_index(0, self.output_device_index)['defaultSampleRate']
+        self.sample_rate = 48000
+        print("Opening stream with device:", p.get_device_info_by_host_api_device_index(0, self.output_device_index)['name'])
+        print("Setting stream sample rate:", self.sample_rate)
 
         # read wavefile
         wf = wave.open("note.wav", 'rb')
-        
         # load into numpy array
         nframes = wf.getnframes()
         audio = wf.readframes(nframes)
         nsamples = nframes * 1
         # Convert buffer to float32 using NumPy                                                                                 
         audio_arr = np.frombuffer(audio, dtype=np.int8)
-
+        
         stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
                         channels=wf.getnchannels(),
-                        rate=wf.getframerate(),
+                        output_device_index=4,
+                        rate=int(self.sample_rate),
                         output=True)
 
         print("stream opened with: ",
             "format=", p.get_format_from_width(wf.getsampwidth()),
             ", channels=", wf.getnchannels(),
-            ", rate=", wf.getframerate())
+            ", rate=", self.sample_rate)
         # current_index = 0
         #initialize current index
         current_index = self.samples.copy()
