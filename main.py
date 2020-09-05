@@ -91,13 +91,7 @@ class Sampler:
 
         # read wavefile
         wf = wave.open("note.wav", 'rb')
-
-        # for paFloat32 sample values must be in range [-1.0, 1.0]
-        # stream = p.open(format=pyaudio.paFloat32,
-        #                 channels=1,
-        #                 rate=fs,
-        #                 output=True)
-
+        
         # load into numpy array
         nframes = wf.getnframes()
         audio = wf.readframes(nframes)
@@ -131,9 +125,6 @@ class Sampler:
                 else:
                     current_index[key] = 0
                     chunks[key] = np.zeros(1, dtype=np.int8)
-                # if chunks[key] != -1:
-                # print("chunks[key]: ", chunks[key])
-                # if len(chunks[key]) > 0:
             for i in range(0, self.chunk_size):
                 sum_of_chunks[i] = 0
                 for key in chunks:
@@ -141,22 +132,10 @@ class Sampler:
                     if i < len(chunks[key]):
                         sum_of_chunks[i] = sum_of_chunks[i] + chunks[key][i]
             stream.write(sum_of_chunks)
-        # current_index = 0
-        # print("nsamples: ", nsamples)
-        # print("len(audio_arr): ", len(audio_arr))
-        # while current_index < len(audio_arr):
-        #     current_index = self.processing_block(stream, audio_arr, current_index, 512)
-
-
-        # print(audio_arr)
-        # print(len(arr))
-        # plt.plot(audio_arr)
         recording = [item for sublist in self.recording for item in sublist]
         print("recording size: ", len(recording))
-        # print(recording)
         plt.plot(recording)
         plt.show()
-        # stream.write(arr * volume)
         print("playing recording...")
         stream.write(np.array(recording, dtype=np.int8))
         print("closing stream")
