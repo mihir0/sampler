@@ -1,0 +1,7 @@
+
+keyboard==0.13.5
+matplotlib==3.3.1
+numpy==1.19.1
+packaging==20.4
+pipwin==0.5.0
+PyAudio @ file:///C:/Users/mihir/pipwin/PyAudio-0.2.11-cp38-cp38-win_amd64.whl
