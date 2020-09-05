@@ -16,7 +16,7 @@ class Sampler:
             path_map (Python Dict)
                 key: String keyname
                 value: String path_to_wav_file
-                example: {"a":"c1.wav"}
+                example: {"a":"c1.wav", ...}
         """
         for key in path_map:
             # read wavefile by loading into numpy array
@@ -45,7 +45,7 @@ class Sampler:
         """
             Parameters:
                 loaded_wav: numpy array initialized with audio frames
-                start_index: long data type indicating where to start playing sample
+                start_index: indicating where to start playing sample
                 chunk_size: number of samples to stream in one block
             Returns:
                 end_index: long containing last sample played
@@ -168,6 +168,5 @@ class Sampler:
 
 if __name__ == "__main__":
     sampler = Sampler()
-    # sampler.load({"a": "note.wav", "s": "note2.wav"})
     sampler.load({"a":"note.wav", "s":"note2.wav", "d": "note3.wav"})
     sampler.start()
