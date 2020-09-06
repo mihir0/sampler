@@ -185,6 +185,7 @@ class Sampler:
         print(sd.query_devices())
         sd.default.samplerate = 44100
         sd.default.channels = 2
+        sd.default.dtype = 'int16'
         wf = wave.open("note_R.wav", 'rb')
         data = wf.readframes(wf.getnframes())
         audio_arr = np.frombuffer(data, dtype=self.dtype)
@@ -201,9 +202,14 @@ class Sampler:
         # obj.setnchannels(2)
         # obj.setsampwidth(2)
         # obj.setframerate(44100)
+        stream = sd.OutputStream(channels=2) #NOTE: !IMPORTANT! output stream is expecting INTERLEAVED array
+        stream.start()
+        # for i in range(L_R.shape[0], 128):
+        stream.write(audio_arr)
+        stream.stop()
         start_time = time.time()
-        sd.play(L_R, blocking=True, samplerate=44100)
-        status = sd.wait()
+        # sd.play(L_R, blocking=True, samplerate=44100)
+        # status = sd.wait()
         end_time = time.time()
         print(end_time - start_time)
         # obj.close()
