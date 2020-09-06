@@ -5,6 +5,7 @@ import time
 import math
 import matplotlib.pyplot as plt
 import keyboard
+import sounddevice as sd
 # from scipy.io import wavfile
 
 class Sampler:
@@ -180,7 +181,35 @@ class Sampler:
         p.terminate()
         print("Finished.")
 
+    def start_sounddevice(self):
+        print(sd.query_devices())
+        sd.default.samplerate = 44100
+        sd.default.channels = 2
+        wf = wave.open("note_R.wav", 'rb')
+        data = wf.readframes(wf.getnframes())
+        audio_arr = np.frombuffer(data, dtype=self.dtype)
+        # audio_arr.reshape(int(len(audio_arr)/2), 2)
+        L = audio_arr[::2]
+        R = audio_arr[1::2]
+        L_R = np.array((L.tolist(), R.tolist()), dtype=self.dtype)
+        L_R = np.reshape(L_R, (L_R[0].size, 2))
+        # L_R = np.array(L.tolist(), dtype=self.dtype)
+        print("L_R ndim:", L_R.ndim)
+        print("L_R shape:", L_R.shape)
+        print("L_R:", L_R)
+        # obj = wave.open('output.wav','w')
+        # obj.setnchannels(2)
+        # obj.setsampwidth(2)
+        # obj.setframerate(44100)
+        start_time = time.time()
+        sd.play(L_R, blocking=True, samplerate=44100)
+        status = sd.wait()
+        end_time = time.time()
+        print(end_time - start_time)
+        # obj.close()
+        self.visualize(audio_arr.tolist())
 if __name__ == "__main__":
     sampler = Sampler()
     sampler.load({"a":"note.wav", "s":"note2.wav", "d": "note3.wav", "f": "note_R.wav"})
-    sampler.start()
+    # sampler.start()
+    sampler.start_sounddevice()
