@@ -11,11 +11,17 @@ import sounddevice as sd
 class Sampler:
     def __init__(self):
         self.recording = []
-        self.samples = {} #key: String, value: loaded sample (numpy array)
-        self.chunk_size = 128 # number of samples to process/stream at once
-        self.sample_rate = None # set in start method
-        self.output_device_index = 4
+        self.samples = {} # key: String note name, value: loaded sample (numpy array)
+        self.pos = {} # key: String note name, value integer indicating current playback position
+        self.chunk_size = 16 # number of samples to process/stream at once
         self.dtype = np.int16
+        self.stream = None
+        self.channels = 2
+        self.output_buffer = None # numpy array containing output samples to be streamed. size = self.channels x self.chunk_size
+        # sd defaults
+        sd.default.samplerate = 44100
+        sd.default.channels = 2
+        sd.default.dtype = 'int16'
     def load(self, path_map):
         """
             path_map (Python Dict)
@@ -36,7 +42,14 @@ class Sampler:
             print("loaded ", path_map[key], " nframes=", nframes, " nsamples=", nsamples, " samplewidth (in bytes)=", samplewidth, " channels=", channels)
             self.samples[key] = audio_arr
         print("self.samples = ", self.samples)
-
+        # intialize sample playback positions
+        self.pos = self.samples.copy()
+        for key in self.pos:
+            self.pos[key] = 0
+        # initialize output buffer
+        self.output_buffer =  np.zeros(self.channels * self.chunk_size, dtype=self.dtype)
+        print("output_buffer initialized:", self.output_buffer)
+        print("output_buffer dtype:", self.output_buffer.dtype)
     def visualize(self, recording):
             recording_L = recording[::2]
             recording_R = recording[1::2]
@@ -47,12 +60,33 @@ class Sampler:
             #         recording_L.append(recording[i])
             #     else:
             #         recording_R.append(recording[i])
-            figs, axs = plt.subplots(2, sharex=True)
+            figs, axs = plt.subplots(2, sharex=True, sharey=True)
             figs.suptitle("Recording")
             axs[0].plot(recording_L)
             axs[1].plot(recording_R)
             plt.show()
+    def update(self, notes_pressed):
+        """
+            Sends samples to output stream based on incoming events
+            Parameters:
+                notes_pressed: LIST of notes pressed. Notes are strings that must match the keys of self.samples exactly.
+        """
+        # ZERO the output buffer
+        for i in range(self.output_buffer.size):
+            self.output_buffer[i] = 0
 
+        for note in notes_pressed:
+            for i in range(min(self.output_buffer.size, self.samples[note].size - self.pos[note])):
+                self.output_buffer[i] = self.samples[note][i + self.pos[note]]
+            self.pos[note] = self.pos[note] + self.output_buffer.size
+        # DEBUGGING-------
+        # print(self.output_buffer)
+        # print(self.samples[note][:self.chunk_size * 2])
+        # print("buffer dtype:", self.output_buffer.dtype, "sample dtype:", self.samples[note].dtype)
+        # exit()
+        # self.stream.write(self.samples[note])
+        #-----------------
+        self.stream.write(self.output_buffer)
     def play_note_wf(self, stream, path, CHUNK):
         print("play_note_wf")
         start_time = time.time()
@@ -101,9 +135,8 @@ class Sampler:
             #     buffer[i] = int(round(float(buffer[i]) * attack_slope * (i + start_index)))
             # buffer[i] = int(.99 * buffer[i]) #reduce volume
         # self.recording.append(buffer.tolist())
-        return end_index, buffer
-        
-    def start(self):
+        return end_index, buffer    
+    def start_2(self):
         p = pyaudio.PyAudio()
         #print host api info
         info = p.get_host_api_info_by_index(0)
@@ -180,7 +213,17 @@ class Sampler:
         print("terminating pyaudio")
         p.terminate()
         print("Finished.")
-
+    def start(self):
+        print(sd.query_devices())
+        sd.default.samplerate = 44100
+        sd.default.channels = 2
+        sd.default.dtype = 'int16'
+        self.stream = sd.OutputStream(channels=2, samplerate=44100)
+        self.stream.start()
+        print("Sampler started...")
+    def close(self):
+        self.stream.stop()
+        print("Sampler stopped.")
     def start_sounddevice(self):
         print(sd.query_devices())
         sd.default.samplerate = 44100
@@ -198,18 +241,14 @@ class Sampler:
         print("L_R ndim:", L_R.ndim)
         print("L_R shape:", L_R.shape)
         print("L_R:", L_R)
-        # obj = wave.open('output.wav','w')
-        # obj.setnchannels(2)
-        # obj.setsampwidth(2)
-        # obj.setframerate(44100)
-        stream = sd.OutputStream(channels=2) #NOTE: !IMPORTANT! output stream is expecting INTERLEAVED array
-        stream.start()
+        self.stream = sd.OutputStream(channels=2) #NOTE: !IMPORTANT! output stream is expecting INTERLEAVED array
+        self.stream.start()
         # for i in range(L_R.shape[0], 128):
-        stream.write(audio_arr)
-        stream.stop()
+        self.stream.write(audio_arr)
+        self.stream.stop()
         start_time = time.time()
         # sd.play(L_R, blocking=True, samplerate=44100)
-        # status = sd.wait()
+        status = sd.wait()
         end_time = time.time()
         print(end_time - start_time)
         # obj.close()
@@ -217,5 +256,8 @@ class Sampler:
 if __name__ == "__main__":
     sampler = Sampler()
     sampler.load({"a":"note.wav", "s":"note2.wav", "d": "note3.wav", "f": "note_R.wav"})
-    # sampler.start()
-    sampler.start_sounddevice()
+    sampler.start()
+    while not keyboard.is_pressed('q'):
+        sampler.update(['f'])
+    sampler.close()
+    # sampler.start_sounddevice()
