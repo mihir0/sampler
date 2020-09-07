@@ -18,9 +18,9 @@ class Sampler:
         self.stream = None
         self.channels = 2
         self.output_buffer = None # numpy array containing output samples to be streamed. size = self.channels x self.chunk_size
-        # sd defaults
-        # sd.default.samplerate = 44100
-        # sd.default.channels = 2
+        # sd defaultsasddasfda
+        sd.default.samplerate = 44100
+        sd.default.channels = 2
         sd.default.dtype = 'int16'
     def load(self, path_map):
         """
@@ -40,8 +40,13 @@ class Sampler:
             np_data = np.frombuffer(audio, dtype=self.dtype)
             # reduce volume
             audio_arr = np.zeros(np_data.size, dtype=self.dtype)
-            for i in range(np_data.size):
-                audio_arr[i] = int(round(np_data[i] * .5))
+            # for i in range(np_data.size):
+            #     audio_arr[i] = int(round(np_data[i] * .5))
+            iter = np.nditer(np_data, flags=['f_index'])
+            for i in iter:
+                audio_arr[iter.index] = i * .5 + .5
+
+            # audio_arr = np_data * .5
             print("ndim: ", audio_arr.ndim, " shape: ", audio_arr.shape)
             print("loaded ", path_map[key], " nframes=", nframes, " nsamples=", nsamples, " samplewidth (in bytes)=", samplewidth, " channels=", channels)
             self.samples[key] = audio_arr
@@ -77,8 +82,6 @@ class Sampler:
         """
         sound_playing = False
         # ZERO the output buffer
-        # for i in range(self.output_buffer.size):
-        #     self.output_buffer[i] = 0
         self.output_buffer.fill(0)
         for note in self.samples: #NOTE: can decrease iterations by only going through notes_pressed list. Currently this implementation will detect when a "keyup" event happens...in this case, the sample position will be set back to 0
             if note in notes_pressed:
