@@ -7,7 +7,7 @@ import sounddevice as sd
 
 class Sampler:
     def __init__(self, record_enabled=False):
-        self.recording = []
+        self.recording = [] # Use for debug recording mode
         self.record_enabled = record_enabled # Used for debugging purposes only.
         self.samples = {} # key: String note name, value: loaded sample (numpy array)
         self.pos = {} # key: String note name, value integer indicating current playback position
