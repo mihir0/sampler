@@ -45,7 +45,6 @@ class Sampler:
             iter = np.nditer(np_data, flags=['f_index'])
             for i in iter:
                 audio_arr[iter.index] = i * .5 + .5
-
             # audio_arr = np_data * .5
             print("ndim: ", audio_arr.ndim, " shape: ", audio_arr.shape)
             print("loaded ", path_map[key], " nframes=", nframes, " nsamples=", nsamples, " samplewidth (in bytes)=", samplewidth, " channels=", channels)
@@ -86,8 +85,9 @@ class Sampler:
         for note in self.samples: #NOTE: can decrease iterations by only going through notes_pressed list. Currently this implementation will detect when a "keyup" event happens...in this case, the sample position will be set back to 0
             if note in notes_pressed:
                 sound_playing = True
-                for i in range(min(self.output_buffer.size, self.samples[note].size - self.pos[note])):
-                    self.output_buffer[i] = self.output_buffer[i] + self.samples[note][i + self.pos[note]]
+                iter = np.nditer(self.output_buffer, flags=['f_index'])
+                for s in iter:
+                    self.output_buffer[iter.index] = s + self.samples[note][iter.index + self.pos[note]]
                 self.pos[note] = self.pos[note] + self.output_buffer.size
             else:
                 self.pos[note] = 0
