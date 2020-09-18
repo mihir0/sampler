@@ -10,15 +10,24 @@ sample_list = []
 keys = []
 def sampler_loop(keys_pressed):
     global sample_map
-    sampler = Sampler()
-    sampler.load(sample_map)
-    # sampler.load_from_list(sample_list)
+    keys = ["a", "s", "d", "f"]
+    sampler = Sampler(record_enabled=False)
+    sample_map = {"a":"note.wav", "s":"note2.wav", "d": "note3.wav", "f": "note_R.wav"}
+    sample_list = [("a", "note.wav"), ("s", "note2.wav"), ("d", "note3.wav"), ("f", "note_R.wav")]
+    # sampler.load(sample_map)
+    sampler.load_from_list(sample_list)
     sampler.start()
     while run_sampler:
-        # sampler.update(keys_pressed)
-        # print("running sampler with keys:", keys_pressed)
+        keys_pressed_list = []
+        i = 0
+        while i < len(keys_pressed):
+            if keys_pressed[i] == 1:
+                keys_pressed_list.append(keys[i])
+                # print("running sampler with keys:", keys_pressed_list)
+            i = i + 1
+        sampler.update(keys_pressed_list)
         # print("running sampler with keys: ", keys_pressed_arr)
-        pass
+        # pass
 def keyboard_loop(keys_pressed):
     global sample_map
     keys = ["a", "s", "d", "f"]
@@ -27,12 +36,14 @@ def keyboard_loop(keys_pressed):
         # for key in sample_map:
         #     if keyboard.is_pressed(key):
         #         keys_pressed.append(key)
-        for i in range(len(keys)):
+        i = 0
+        while i < len(keys):
             if keyboard.is_pressed(keys[i]):
                 keys_pressed[i] = 1
             else:
                 keys_pressed[i] = 0
-        print("key pressed:", keys_pressed[:])
+            i = i + 1
+        # print("key pressed:", keys_pressed[:])
     run_sampler = False
 
 if __name__ == "__main__":

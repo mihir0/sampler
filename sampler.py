@@ -11,6 +11,7 @@ class Sampler:
         self.recording = [] # Use for debug recording mode
         self.record_enabled = record_enabled # Used for debugging purposes only.
         self.samples = {} # key: String note name, value: loaded sample (numpy array)
+        self.keys = None # Np array of strings. Only set when load_from_list is called
         self.pos = {} # key: String note name, value integer indicating current playback position
         self.chunk_size = 64 # number of samples to process/stream at once
         self.dtype = np.int16
@@ -60,10 +61,17 @@ class Sampler:
         load sampler using list of tuples
         """
         path_map = {}
+        key_list = []
         for x, y in path_list:
             path_map[x] = y
+            key_list.append(x)
         self.load(path_map)
-        
+        try:
+            self.keys = np.array(key_list, dtype=np.dtype('U4'))
+            print("loaded keys:", self.keys)
+        except:
+            print("An exception occured when filling up keys array. The key names must be a list of string no longer than 4 characters.")
+            exit()
     def visualize(self, recording):
         recording_L = recording[::2]
         recording_R = recording[1::2]
