@@ -4,6 +4,7 @@ import time
 import math
 import matplotlib.pyplot as plt
 import sounddevice as sd
+from typing import List, Tuple
 
 class Sampler:
     def __init__(self, record_enabled=False):
@@ -20,7 +21,7 @@ class Sampler:
         sd.default.samplerate = 44100
         sd.default.channels = 2
         sd.default.dtype = 'int16'
-    def load(self, path_map):
+    def load(self, path_map: dict):
         """
             path_map (Python Dict)
                 key: String keyname
@@ -54,6 +55,15 @@ class Sampler:
         self.output_buffer =  np.zeros(self.channels * self.chunk_size, dtype=self.dtype)
         # print("output_buffer initialized:", self.output_buffer)
         # print("output_buffer dtype:", self.output_buffer.dtype)
+    def load_from_list(self, path_list:List[Tuple[str, str]]):
+        """
+        load sampler using list of tuples
+        """
+        path_map = {}
+        for x, y in path_list:
+            path_map[x] = y
+        self.load(path_map)
+        
     def visualize(self, recording):
         recording_L = recording[::2]
         recording_R = recording[1::2]
