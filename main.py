@@ -2,7 +2,7 @@ import keyboard
 from sampler import Sampler
 
 if __name__ == "__main__":
-    sampler = Sampler(sample_rate=44100)
+    sampler = Sampler(sample_rate=48000)
     sample_map = {"a":"01.wav", "s":"02.wav", "d": "03.wav", "f": "04.wav"}
     sampler.load(sample_map, "samples/legopiano1/")
     sampler.start()
