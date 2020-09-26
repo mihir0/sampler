@@ -2,9 +2,9 @@ import keyboard
 from sampler import Sampler
 
 if __name__ == "__main__":
-    sampler = Sampler()
-    sample_map = {"a":"note.wav", "s":"note2.wav", "d": "note3.wav", "f": "note_R.wav"}
-    sampler.load(sample_map)
+    sampler = Sampler(sample_rate=44100)
+    sample_map = {"a":"01.wav", "s":"02.wav", "d": "03.wav", "f": "04.wav"}
+    sampler.load(sample_map, "samples/legopiano1/")
     sampler.start()
     while not keyboard.is_pressed('q'):
         keys_pressed = []

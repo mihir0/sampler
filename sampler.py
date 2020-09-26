@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import sounddevice as sd
 
 class Sampler:
-    def __init__(self, record_enabled=False):
+    def __init__(self, record_enabled=False, sample_rate=44100):
         self.recording = [] # Use for debug recording mode
         self.record_enabled = record_enabled # Used for debugging purposes only.
         self.samples = {} # key: String note name, value: loaded sample (numpy array)
@@ -17,10 +17,10 @@ class Sampler:
         self.channels = 2
         self.output_buffer = None # numpy array containing output samples to be streamed. size = self.channels x self.chunk_size
         # sd default
-        sd.default.samplerate = 44100
+        sd.default.samplerate = sample_rate
         sd.default.channels = 2
         sd.default.dtype = 'int16'
-    def load(self, path_map):
+    def load(self, path_map, root_dir:str = ""):
         """
             path_map (Python Dict)
                 key: String keyname
@@ -29,7 +29,7 @@ class Sampler:
         """
         for key in path_map:
             # read wavefile by loading into numpy array
-            wf = wave.open(path_map[key], 'rb')
+            wf = wave.open(root_dir + path_map[key], 'rb')
             nframes = wf.getnframes()
             audio = wf.readframes(nframes)
             samplewidth = wf.getsampwidth()
