@@ -10,6 +10,7 @@ def set_array(size):
     while i < arr.size:
         arr[i] = i
         i += 1
+
 @cython.wraparound(False)
 cpdef set_array_optimized(int size):
     arr = np.zeros((size,), dtype=int)

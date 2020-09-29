@@ -3,7 +3,7 @@ from Cython.Build import cythonize
 
 setup(
     name='Hello world app',
-    ext_modules=cythonize("cython_helloworld.pyx"),
+    ext_modules=cythonize(["*.pyx"]),
     zip_safe=False,
 )
 
