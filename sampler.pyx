@@ -4,6 +4,7 @@ import time
 import math
 import matplotlib.pyplot as plt
 import sounddevice as sd
+import cython
 
 cdef class Sampler:
     cdef public object recording
@@ -29,13 +30,18 @@ cdef class Sampler:
         sd.default.samplerate = sample_rate
         sd.default.channels = 2
         sd.default.dtype = 'int16'
-    def load(self, path_map, root_dir:str = ""):
+    
+    @cython.wraparound(False)
+    cpdef load(self, path_map, root_dir:str = "", gain=1.0):
         """
             path_map (Python Dict)
                 key: String keyname
                 value: String path_to_wav_file
                 example: {"a":"c1.wav", ...}
         """
+        cdef short[:] audio_arr_view
+        cdef float sample
+        cdef float fgain = <float> gain
         for key in path_map:
             # read wavefile by loading into numpy array
             wf = wave.open(root_dir + path_map[key], 'rb')
@@ -47,13 +53,20 @@ cdef class Sampler:
             np_data = np.frombuffer(audio, dtype=self.dtype)
             # reduce volume
             audio_arr = np.zeros(np_data.size, dtype=self.dtype)
-            iter = np.nditer(np_data, flags=['f_index'])
-            for i in iter:
-                audio_arr[iter.index] = i * .5 + .5
-            # audio_arr = np_data * .5 #NOTE: fastest way but has lower quality due to truncation
+            audio_arr_view = audio_arr
+            for i in range(audio_arr_view.shape[0]):
+                # print(f"audio_arr_view[{i}]: {audio_arr_view[i]}, audio_arr[{i}]: {audio_arr[i]}")
+                sample = <float> np_data[i]
+                # print("sample before multiplication:", sample)
+                sample = (sample * fgain) + .5
+                # if sample != 0:
+                #     print(sample)
+                audio_arr_view[i] = <short> sample
             print("ndim:", audio_arr.ndim, "shape:", audio_arr.shape)
             print("loaded", path_map[key], "nframes=", nframes, "nsamples=", nsamples, "samplewidth (in bytes)=", samplewidth, "channels=", channels)
             self.samples[key] = audio_arr
+            # plt.plot(self.samples[key])
+            # plt.show()
         print("self.samples = ", self.samples)
         # intialize sample playback positions
         self.pos = self.samples.copy()
@@ -111,7 +124,7 @@ cdef class Sampler:
             if note in notes_pressed:
                 sound_playing = True
                 sample = self.samples[note]
-                # iter = np.nditer(self.output_buffer, flags=['f_index'])
+                iter = np.nditer(self.output_buffer, flags=['f_index'])
                 # for s in iter:
                 #     sample_index = iter.index + self.pos[note]
                 #     if sample_index < sample.size:
@@ -123,6 +136,10 @@ cdef class Sampler:
                 self.pos[note] = self.pos[note] + self.output_buffer.size
             else:
                 self.pos[note] = 0
+        if sound_playing:
+            self.stream.write(self.output_buffer)
+            if self.record_enabled:
+                self.recording.append(np.array(self.output_buffer, dtype=self.dtype))
 
     def start(self):
         print(sd.query_devices())
