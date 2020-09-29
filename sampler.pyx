@@ -16,6 +16,7 @@ cdef class Sampler:
     cdef public object stream
     cdef public object channels
     cdef public object output_buffer
+
     def __init__(self, record_enabled=False, sample_rate=44100):
         self.recording = [] # Use for debug recording mode
         self.record_enabled = record_enabled # Used for debugging purposes only.
@@ -74,6 +75,7 @@ cdef class Sampler:
             self.pos[key] = 0
         # initialize output buffer
         self.output_buffer =  np.zeros(self.channels * self.chunk_size, dtype=self.dtype)
+
         # print("output_buffer initialized:", self.output_buffer)
         # print("output_buffer dtype:", self.output_buffer.dtype)
     def visualize(self, recording):
@@ -116,24 +118,27 @@ cdef class Sampler:
             self.stream.write(self.output_buffer)
             if self.record_enabled:
                 self.recording.append(np.array(self.output_buffer, dtype=self.dtype))
+    
+    @cython.wraparound(False)
     cpdef update_optimized(self, list notes_pressed):
         cdef bint sound_playing = False
+        cdef short[:] output_buffer_view = self.output_buffer
+        cdef int i
+        cdef int sample_index
+        cdef short[:] sample
         # Zero the output buffer
-        self.output_buffer.fill(0)
+        # self.output_buffer.fill(0)
+        for i in range(output_buffer_view.shape[0]):
+            output_buffer_view[i] = 0
         for note in self.samples:
             if note in notes_pressed:
                 sound_playing = True
                 sample = self.samples[note]
-                iter = np.nditer(self.output_buffer, flags=['f_index'])
-                # for s in iter:
-                #     sample_index = iter.index + self.pos[note]
-                #     if sample_index < sample.size:
-                #         self.output_buffer[iter.index] = s + sample[sample_index]
-                for i in range(self.output_buffer.size):
-                    sample_index = i + self.pos[note]
-                    if sample_index < sample.size:
-                        self.output_buffer[i] = self.output_buffer[i] + sample[sample_index]
-                self.pos[note] = self.pos[note] + self.output_buffer.size
+                for i in range(output_buffer_view.shape[0]):
+                    sample_index = i + <int> self.pos[note]
+                    if sample_index < sample.shape[0]:
+                        output_buffer_view[i] = output_buffer_view[i] + sample[sample_index]
+                self.pos[note] = self.pos[note] + output_buffer_view.shape[0]
             else:
                 self.pos[note] = 0
         if sound_playing:
