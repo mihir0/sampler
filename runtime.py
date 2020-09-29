@@ -27,7 +27,7 @@ def time_block_opt(repetitions=1):
     keys_pressed = ["a", "s", "d", "f"]
     start = time.time_ns()
     for i in range(repetitions):
-        sampler.update(keys_pressed)
+        sampler.update_optimized(keys_pressed)
     end = time.time_ns()
     print(f"Time: {end-start} ns, {(end-start) / (10 ** 9)} sec")
 
@@ -49,6 +49,7 @@ def time_arr_fill_opt(repetitions=1):
 if __name__ == "__main__":
     setup()
     time_block(750)
+    time_block_opt(750)
     # time_arr_fill(1000)
     # time_arr_fill_opt(1000)
 

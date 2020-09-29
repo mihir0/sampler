@@ -5,7 +5,16 @@ import math
 import matplotlib.pyplot as plt
 import sounddevice as sd
 
-class Sampler:
+cdef class Sampler:
+    cdef public object recording
+    cdef public object record_enabled
+    cdef public object samples
+    cdef public object pos
+    cdef public object chunk_size
+    cdef public object dtype
+    cdef public object stream
+    cdef public object channels
+    cdef public object output_buffer
     def __init__(self, record_enabled=False, sample_rate=44100):
         self.recording = [] # Use for debug recording mode
         self.record_enabled = record_enabled # Used for debugging purposes only.
@@ -94,6 +103,27 @@ class Sampler:
             self.stream.write(self.output_buffer)
             if self.record_enabled:
                 self.recording.append(np.array(self.output_buffer, dtype=self.dtype))
+    cpdef update_optimized(self, list notes_pressed):
+        cdef bint sound_playing = False
+        # Zero the output buffer
+        self.output_buffer.fill(0)
+        for note in self.samples:
+            if note in notes_pressed:
+                sound_playing = True
+                sample = self.samples[note]
+                # iter = np.nditer(self.output_buffer, flags=['f_index'])
+                # for s in iter:
+                #     sample_index = iter.index + self.pos[note]
+                #     if sample_index < sample.size:
+                #         self.output_buffer[iter.index] = s + sample[sample_index]
+                for i in range(self.output_buffer.size):
+                    sample_index = i + self.pos[note]
+                    if sample_index < sample.size:
+                        self.output_buffer[i] = self.output_buffer[i] + sample[sample_index]
+                self.pos[note] = self.pos[note] + self.output_buffer.size
+            else:
+                self.pos[note] = 0
+
     def start(self):
         print(sd.query_devices())
         self.stream = sd.OutputStream()
