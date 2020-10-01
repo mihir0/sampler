@@ -35,6 +35,19 @@ def time_block_opt(repetitions=1):
     end = time.time_ns()
     print(f"Time: {end-start} ns, {(end-start) / (10 ** 9)} sec")
 
+def time_block_opt_v2(repetitions=1):
+    # keys_pressed = ["a", "s", "d", "f"]
+    # keys_pressed = list(sample_map.keys())
+    keys = []
+    for i in range(len(sample_map.keys())):
+        keys.append(1)
+    keys_arr = np.array(keys, dtype=np.int16)
+    start = time.time_ns()
+    for i in range(repetitions):
+        sampler.update_optimized_v2(keys_arr)
+    end = time.time_ns()
+    print(f"Time: {end-start} ns, {(end-start) / (10 ** 9)} sec")
+
 def time_arr_fill(repetitions=1):
     start = time.time_ns()
     for i in range(repetitions):
@@ -80,6 +93,7 @@ if __name__ == "__main__":
     time_block(750)
     # time.sleep(6)
     time_block_opt(750)
+    time_block_opt_v2(750)
     # time_arr_fill(1000)
     # time_arr_fill_opt(1000)
 

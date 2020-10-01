@@ -23,10 +23,10 @@ cdef class Sampler:
     cdef public object disable_output
 
     # C data types for optimized playback
-    cdef short[:, :] sample_view    # sample data
-    cdef unsigned int[:] key_view   # key activation data
-    cdef short[:] output_buffer_view    # output buffer
-    cdef double[:] pos_view                # sample position
+    cdef short[:, :] sample_view            # sample data
+    cdef unsigned int[:] key_view           # key activation data
+    cdef short[:] output_buffer_view        # output buffer
+    cdef unsigned int[:] pos_view           # sample position
 
     def keyToAsciiBuffer(self, char_arr) -> int:
         result: int
@@ -116,7 +116,7 @@ cdef class Sampler:
         self.pos = self.samples.copy()
         for key in self.pos:
             self.pos[key] = 0
-        self.pos_view = np.zeros(len(keys), dtype=np.double)
+        self.pos_view = np.zeros(len(keys), dtype=np.uint)
 
         # initialize output buffer
         self.output_buffer =  np.zeros(self.channels * self.chunk_size, dtype=self.dtype)
@@ -214,18 +214,19 @@ cdef class Sampler:
     
     @cython.wraparound(False)
     @cython.boundscheck(False)
-    cpdef update_optimized_v2(self, bint[:] keys_arr):
+    cpdef update_optimized_v2(self, short[:] keys_arr):
         cdef bint sound_playing = False
-        # cdef unsigned int i, p
-        # cdef unsigned int sample_index
-        # cdef short[:] sample
-        """
+        cdef unsigned int i
+        cdef unsigned int p
+        cdef unsigned int sample_index
+        cdef short[:] sample
+        # """
         # Zero the output buffer
         for i in range(self.output_buffer_view.shape[0]):
             self.output_buffer_view[i] = 0
         # for every sound file
         for p in range(self.sample_view.shape[0]):
-            if keys_arr[p]:
+            if keys_arr[p] == 1:
                 sound_playing = True
                 sample = self.sample_view[p]
                 for i in range(self.output_buffer_view.shape[0]):
@@ -240,7 +241,7 @@ cdef class Sampler:
                 self.stream.write(self.output_buffer_view)
             if self.record_enabled:
                 self.recording.append(np.array(self.output_buffer, dtype=self.dtype))
-        """
+        # """
     
     
     
