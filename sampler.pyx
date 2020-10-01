@@ -4,7 +4,7 @@ import time
 import math
 import matplotlib.pyplot as plt
 import sounddevice as sd
-import cython
+cimport cython
 
 cdef class Sampler:
     cdef public object recording
@@ -17,7 +17,34 @@ cdef class Sampler:
     cdef public object channels
     cdef public object output_buffer
 
-    def __init__(self, record_enabled=False, sample_rate=44100):
+    cdef public object sample_arr
+    cdef public object key_arr
+
+    cdef public object disable_output
+
+    cdef short[:, :] sample_arr_view
+    cdef unsigned int[:] key_arr_view
+
+    def keyToAsciiBuffer(self, char_arr) -> int:
+        result: int
+        result = 0
+        if len(char_arr) > 4:
+            raise Exception("char array must not exceed 4")
+        #input unicode
+        #output int
+        for i in range(len(char_arr)):
+            result = (result << 8) | ord(char_arr[i])
+        return result
+
+    def asciiToKey(self, ascii: int):
+        result = []
+        for i in range(4):
+            chunk = ascii & 255
+            ch = chr(chunk)
+            result.insert(0, ch)
+            ascii = ascii >> 8
+        return result
+    def __init__(self, record_enabled=False, sample_rate=44100, disable_output=False):
         self.recording = [] # Use for debug recording mode
         self.record_enabled = record_enabled # Used for debugging purposes only.
         self.samples = {} # key: String note name, value: loaded sample (numpy array)
@@ -27,11 +54,17 @@ cdef class Sampler:
         self.stream = None
         self.channels = 2
         self.output_buffer = None # numpy array containing output samples to be streamed. size = self.channels x self.chunk_size
+    
+        self.sample_arr = None #Numpy arrays
+        self.key_arr = None
+
+        self.disable_output = disable_output
+
         # sd default
         sd.default.samplerate = sample_rate
         sd.default.channels = 2
         sd.default.dtype = 'int16'
-    
+
     @cython.wraparound(False)
     cpdef load(self, path_map, root_dir:str = "", gain=1.0):
         """
@@ -40,9 +73,13 @@ cdef class Sampler:
                 value: String path_to_wav_file
                 example: {"a":"c1.wav", ...}
         """
+        # c data initializing
         cdef short[:] audio_arr_view
         cdef float sample
         cdef float fgain = <float> gain
+        cdef int i
+        files = []
+        keys: List[int] = []
         for key in path_map:
             # read wavefile by loading into numpy array
             wf = wave.open(root_dir + path_map[key], 'rb')
@@ -66,6 +103,8 @@ cdef class Sampler:
             print("ndim:", audio_arr.ndim, "shape:", audio_arr.shape)
             print("loaded", path_map[key], "nframes=", nframes, "nsamples=", nsamples, "samplewidth (in bytes)=", samplewidth, "channels=", channels)
             self.samples[key] = audio_arr
+            files.append(audio_arr)
+            keys.append(self.keyToAsciiBuffer(list(key)))
             # plt.plot(self.samples[key])
             # plt.show()
         print("self.samples = ", self.samples)
@@ -75,9 +114,23 @@ cdef class Sampler:
             self.pos[key] = 0
         # initialize output buffer
         self.output_buffer =  np.zeros(self.channels * self.chunk_size, dtype=self.dtype)
-
         # print("output_buffer initialized:", self.output_buffer)
         # print("output_buffer dtype:", self.output_buffer.dtype)
+
+        self.sample_arr = np.array(files, dtype=self.dtype)
+        self.key_arr = np.array(keys, dtype=np.uint)
+        self.sample_arr_view = self.sample_arr
+        self.key_arr_view = self.key_arr
+        print("sample_arr_view: ", self.sample_arr_view)
+        print("key_arr_view: ", self.key_arr_view)
+        # DEBUGGING
+        # for i in range(self.sample_arr_view.shape[0]):
+        #     print(f"sample_arr_view[{i}]:", self.sample_arr_view[i])
+        #     print(f"key_arr_view[{i}]:", self.key_arr_view[i])
+
+        print("sample_arr:", self.sample_arr)
+        print("key_arr:", self.key_arr)
+
     def visualize(self, recording):
         recording_L = recording[::2]
         recording_R = recording[1::2]
@@ -86,6 +139,7 @@ cdef class Sampler:
         axs[0].plot(recording_L)
         axs[1].plot(recording_R)
         plt.show()
+
     def update(self, notes_pressed):
         """
             Sends samples to output stream based on incoming events
@@ -115,7 +169,8 @@ cdef class Sampler:
         # self.stream.write(self.samples[note])
         #-----------------
         if sound_playing:
-            self.stream.write(self.output_buffer)
+            if not self.disable_output:
+                self.stream.write(self.output_buffer)
             if self.record_enabled:
                 self.recording.append(np.array(self.output_buffer, dtype=self.dtype))
     
@@ -142,7 +197,8 @@ cdef class Sampler:
             else:
                 self.pos[note] = 0
         if sound_playing:
-            self.stream.write(self.output_buffer)
+            if not self.disable_output:
+                self.stream.write(self.output_buffer)
             if self.record_enabled:
                 self.recording.append(np.array(self.output_buffer, dtype=self.dtype))
 
