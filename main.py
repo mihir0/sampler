@@ -1,7 +1,8 @@
 import keyboard
 from sampler import Sampler
+from keylistener import KeyListener
 
-if __name__ == "__main__":
+def start():
     sampler = Sampler(sample_rate=48000, record_enabled=True)
     sample_map = {"a":"01.wav", "s":"02.wav", "d": "03.wav", "f": "04.wav", "g": "05.wav", "h": "06.wav", "j": "07.wav", "k": "08.wav", "l": "09.wav", ":": "10.wav", "'":"11.wav", "w":"12.wav", "e":"13.wav", "r":"14.wav", "t":"15.wav", "y":"16.wav", "u":"17.wav", "i":"18.wav", "o":"19.wav", "p":"20.wav", "[": "21.wav", "]":"22.wav"}
     # sample_map = {"a":"01.wav", "s":"02.wav", "d": "03.wav", "f": "04.wav"}
@@ -15,3 +16,16 @@ if __name__ == "__main__":
         # sampler.update(keys_pressed)
         sampler.update_optimized(keys_pressed)
     sampler.close()
+
+def start_v2():
+    sampler = Sampler(sample_rate=48000, record_enabled=True)
+    sample_map = {"a":"01.wav", "s":"02.wav", "d": "03.wav", "f": "04.wav", "g": "05.wav", "h": "06.wav", "j": "07.wav", "k": "08.wav", "l": "09.wav", ":": "10.wav", "'":"11.wav", "w":"12.wav", "e":"13.wav", "r":"14.wav", "t":"15.wav", "y":"16.wav", "u":"17.wav", "i":"18.wav", "o":"19.wav", "p":"20.wav", "[": "21.wav", "]":"22.wav"}
+    # sample_map = {"a":"01.wav", "s":"02.wav", "d": "03.wav", "f": "04.wav"}
+    sampler.load(sample_map, "samples/legopiano1/")
+    sampler.start()
+    listener = KeyListener(sampler)
+    listener.start_listening()
+    sampler.close()
+
+if __name__ == "__main__":
+    start_v2()

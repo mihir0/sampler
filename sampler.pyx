@@ -140,8 +140,8 @@ cdef class Sampler:
         # for i in range(self.sample_view.shape[0]):
         #     print(f"sample_view[{i}]:", self.sample_view[i])
         #     print(f"key_view[{i}]:", self.key_view[i])
-
-
+    def generate_key_press_array(self):
+        return np.zeros(len(self.key_arr), dtype=np.int16)
     def visualize(self, recording):
         recording_L = recording[::2]
         recording_R = recording[1::2]
