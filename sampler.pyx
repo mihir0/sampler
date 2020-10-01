@@ -22,8 +22,11 @@ cdef class Sampler:
 
     cdef public object disable_output
 
-    cdef short[:, :] sample_arr_view
-    cdef unsigned int[:] key_arr_view
+    # C data types for optimized playback
+    cdef short[:, :] sample_arr_view    # sample data
+    cdef unsigned int[:] key_arr_view   # key activation data
+    cdef short[:] output_buffer_view    # output buffer
+    cdef int[:] pos_view                # sample position
 
     def keyToAsciiBuffer(self, char_arr) -> int:
         result: int
@@ -73,7 +76,7 @@ cdef class Sampler:
                 value: String path_to_wav_file
                 example: {"a":"c1.wav", ...}
         """
-        # c data initializing
+        # C data initializing
         cdef short[:] audio_arr_view
         cdef float sample
         cdef float fgain = <float> gain
@@ -108,28 +111,36 @@ cdef class Sampler:
             # plt.plot(self.samples[key])
             # plt.show()
         print("self.samples = ", self.samples)
+
         # intialize sample playback positions
         self.pos = self.samples.copy()
         for key in self.pos:
             self.pos[key] = 0
+        self.pos_view = np.array(list(self.pos.keys()), dtype=np.uint)
+
         # initialize output buffer
         self.output_buffer =  np.zeros(self.channels * self.chunk_size, dtype=self.dtype)
+        self.output_buffer_view = self.output_buffer
         # print("output_buffer initialized:", self.output_buffer)
         # print("output_buffer dtype:", self.output_buffer.dtype)
 
+        # initialize sample array
         self.sample_arr = np.array(files, dtype=self.dtype)
-        self.key_arr = np.array(keys, dtype=np.uint)
         self.sample_arr_view = self.sample_arr
-        self.key_arr_view = self.key_arr
+        print("sample_arr:", self.sample_arr)
         print("sample_arr_view: ", self.sample_arr_view)
+        
+        # initialize key array
+        self.key_arr = np.array(keys, dtype=np.uint)
+        self.key_arr_view = self.key_arr
+        print("key_arr:", self.key_arr)
         print("key_arr_view: ", self.key_arr_view)
+        
         # DEBUGGING
         # for i in range(self.sample_arr_view.shape[0]):
         #     print(f"sample_arr_view[{i}]:", self.sample_arr_view[i])
         #     print(f"key_arr_view[{i}]:", self.key_arr_view[i])
 
-        print("sample_arr:", self.sample_arr)
-        print("key_arr:", self.key_arr)
 
     def visualize(self, recording):
         recording_L = recording[::2]
@@ -177,28 +188,26 @@ cdef class Sampler:
     @cython.wraparound(False)
     cpdef update_optimized(self, list notes_pressed):
         cdef bint sound_playing = False
-        cdef short[:] output_buffer_view = self.output_buffer
         cdef int i
         cdef int sample_index
         cdef short[:] sample
         # Zero the output buffer
-        # self.output_buffer.fill(0)
-        for i in range(output_buffer_view.shape[0]):
-            output_buffer_view[i] = 0
+        for i in range(self.output_buffer_view.shape[0]):
+            self.output_buffer_view[i] = 0
         for note in self.samples:
             if note in notes_pressed:
                 sound_playing = True
                 sample = self.samples[note]
-                for i in range(output_buffer_view.shape[0]):
+                for i in range(self.output_buffer_view.shape[0]):
                     sample_index = i + <int> self.pos[note]
                     if sample_index < sample.shape[0]:
-                        output_buffer_view[i] = output_buffer_view[i] + sample[sample_index]
-                self.pos[note] = self.pos[note] + output_buffer_view.shape[0]
+                        self.output_buffer_view[i] = self.output_buffer_view[i] + sample[sample_index]
+                self.pos[note] = self.pos[note] + self.output_buffer_view.shape[0]
             else:
                 self.pos[note] = 0
         if sound_playing:
             if not self.disable_output:
-                self.stream.write(self.output_buffer)
+                self.stream.write(self.output_buffer_view)
             if self.record_enabled:
                 self.recording.append(np.array(self.output_buffer, dtype=self.dtype))
 
@@ -206,7 +215,7 @@ cdef class Sampler:
         print(sd.query_devices())
         self.stream = sd.OutputStream()
         self.stream.start()
-        print("Sample rate:", sd.default.samplerate, "channels:", sd.default.channels, "chunk size:", self.chunk_size, "debug recording mode:", self.record_enabled)
+        print("Sample rate:", sd.default.samplerate, "channels:", sd.default.channels, "chunk size:", self.chunk_size, "debug recording mode:", self.record_enabled, "disable output:", self.disable_output)
         print("Sampler started...")
     def close(self):
         if self.record_enabled:
