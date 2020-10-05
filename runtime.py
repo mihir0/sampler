@@ -38,6 +38,7 @@ def time_block_opt(repetitions=1):
 def time_block_opt_v2(repetitions=1):
     # keys_pressed = ["a", "s", "d", "f"]
     # keys_pressed = list(sample_map.keys())
+    sampler.disable_output = False
     keys = []
     for i in range(len(sample_map.keys())):
         keys.append(1)
@@ -90,10 +91,10 @@ def test_keyToInt():
 if __name__ == "__main__":
     setup()
     # test_keyToInt()
-    time_block(750)
+    # time_block(750)
     # time.sleep(6)
-    time_block_opt(750)
-    time_block_opt_v2(750)
+    # time_block_opt(750)
+    time_block_opt_v2(1500)
     # time_arr_fill(1000)
     # time_arr_fill_opt(1000)
 

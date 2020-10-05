@@ -1,4 +1,5 @@
 import wave
+import itertools
 import numpy as np
 import time
 import math
@@ -23,10 +24,11 @@ cdef class Sampler:
     cdef public object disable_output
 
     # C data types for optimized playback
-    cdef short[:, :] sample_view            # sample data
-    cdef unsigned int[:] key_view           # key activation data
-    cdef short[:] output_buffer_view        # output buffer
-    cdef unsigned int[:] pos_view           # sample position
+    cdef short[:] sample_view                       # sample data... all samples in one contiguous block
+    cdef unsigned int[:, :] sample_start_end_view   
+    cdef unsigned int[:] key_view                   # key activation data
+    cdef short[:] output_buffer_view                # output buffer
+    cdef unsigned int[:] pos_view                   # sample position
 
     def keyToAsciiBuffer(self, char_arr) -> int:
         result: int
@@ -81,33 +83,40 @@ cdef class Sampler:
         cdef float sample
         cdef float fgain = <float> gain
         cdef int i
+        cdef short[:] np_data_view
+        cdef unsigned int pos = 0
         files = []
+        start_end = []
         keys: List[int] = []
         for key in path_map:
             # read wavefile by loading into numpy array
             wf = wave.open(root_dir + path_map[key], 'rb')
+            np_data_view = np.fromfile(root_dir + path_map[key], dtype=self.dtype)
             nframes = wf.getnframes()
             audio = wf.readframes(nframes)
             samplewidth = wf.getsampwidth()
             nsamples = nframes * 1
             channels = wf.getnchannels()
-            np_data = np.frombuffer(audio, dtype=self.dtype)
+            # np_data = np.frombuffer(audio, dtype=self.dtype)
             # reduce volume
-            audio_arr = np.zeros(np_data.size, dtype=self.dtype)
+            # audio_arr = np.zeros(np_data.size, dtype=self.dtype)
+            audio_arr = np.zeros(np_data_view.shape[0], dtype=self.dtype)
             audio_arr_view = audio_arr
             for i in range(audio_arr_view.shape[0]):
                 # print(f"audio_arr_view[{i}]: {audio_arr_view[i]}, audio_arr[{i}]: {audio_arr[i]}")
-                sample = <float> np_data[i]
+                sample = <float> np_data_view[i]
                 # print("sample before multiplication:", sample)
                 sample = (sample * fgain) + .5
                 # if sample != 0:
                 #     print(sample)
                 audio_arr_view[i] = <short> sample
             print("ndim:", audio_arr.ndim, "shape:", audio_arr.shape)
-            print("loaded", path_map[key], "nframes=", nframes, "nsamples=", nsamples, "samplewidth (in bytes)=", samplewidth, "channels=", channels)
+            print("loaded", path_map[key], "nframes =", nframes, "nsamples =", nsamples, "samplewidth (in bytes) =", samplewidth, "channels =", channels)
             self.samples[key] = audio_arr
             files.append(audio_arr)
             keys.append(self.keyToAsciiBuffer(list(key)))
+            start_end.append([pos, pos + audio_arr_view.shape[0]])
+            pos = pos + audio_arr_view.shape[0]
             # plt.plot(self.samples[key])
             # plt.show()
         print("self.samples = ", self.samples)
@@ -125,16 +134,18 @@ cdef class Sampler:
         # print("output_buffer dtype:", self.output_buffer.dtype)
 
         # initialize sample array
-        self.sample_arr = np.array(files, dtype=self.dtype)
+        print("files:", files)
+        self.sample_arr = np.array(list(itertools.chain.from_iterable(files)), dtype=self.dtype)
         self.sample_view = self.sample_arr
         print("sample_arr:", self.sample_arr)
         print("sample_view: ", self.sample_view)
+        self.sample_start_end_view = np.array(start_end, dtype=np.uint)
         
         # initialize key array
         self.key_arr = np.array(keys, dtype=np.uint)
         self.key_view = self.key_arr
         print("key_arr:", self.key_arr)
-        print("key_view: ", self.key_view)
+        print("key_view:", self.key_view)
         
         # DEBUGGING
         # for i in range(self.sample_view.shape[0]):
@@ -225,14 +236,21 @@ cdef class Sampler:
         for i in range(self.output_buffer_view.shape[0]):
             self.output_buffer_view[i] = 0
         # for every sound file
-        for p in range(self.sample_view.shape[0]):
+        for p in range(self.sample_start_end_view.shape[0]):
             if keys_arr[p] == 1:
                 sound_playing = True
+                for i in range(self.output_buffer_view.shape[0]):
+                    sample_index = i + self.sample_start_end_view[p][0] + self.pos_view[p]
+                    if sample_index < self.sample_start_end_view[p][1]:
+                        self.output_buffer_view[i] = self.output_buffer_view[i] + self.sample_view[sample_index] 
+
+                '''
                 sample = self.sample_view[p]
                 for i in range(self.output_buffer_view.shape[0]):
                     sample_index = i + self.pos_view[p]
                     if sample_index < sample.shape[0]:
                         self.output_buffer_view[i] = self.output_buffer_view[i] + sample[sample_index]
+                '''
                 self.pos_view[p] = self.pos_view[p] + self.output_buffer_view.shape[0]
             else:
                 self.pos_view[p] = 0
