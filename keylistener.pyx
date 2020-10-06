@@ -24,4 +24,3 @@ cdef class KeyListener():
                 else:
                     key_arr[i] = 0
             self.sampler.update_optimized_v2(key_arr)
-    
