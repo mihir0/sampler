@@ -25,7 +25,7 @@ cdef class Sampler:
 
     # C data types for optimized playback
     cdef short[:] sample_view                       # sample data... all samples in one contiguous block
-    cdef unsigned int[:, :] sample_start_end_view   
+    cdef unsigned int[:, :] sample_start_end_view   # Where each file starts/end in memory. index = file, [sample start, sample end]
     cdef unsigned int[:] key_view                   # key activation data
     cdef short[:] output_buffer_view                # output buffer
     cdef unsigned int[:] pos_view                   # sample position
@@ -71,6 +71,15 @@ cdef class Sampler:
         sd.default.dtype = 'int16'
 
     @cython.wraparound(False)
+    def visualize(self, recording):
+        recording_L = recording[::2]
+        recording_R = recording[1::2]
+        figs, axs = plt.subplots(2, sharex=True, sharey=True)
+        figs.suptitle("Recording")
+        axs[0].plot(recording_L)
+        axs[1].plot(recording_R)
+        plt.show()
+        
     cpdef load(self, path_map, root_dir:str = "", gain=1.0):
         """
             path_map (Python Dict)
@@ -86,40 +95,36 @@ cdef class Sampler:
         cdef short[:] np_data_view
         cdef unsigned int pos = 0
         files = []
+        np_files = np.array(files, dtype=self.dtype)
         start_end = []
         keys: List[int] = []
         for key in path_map:
             # read wavefile by loading into numpy array
             wf = wave.open(root_dir + path_map[key], 'rb')
-            np_data_view = np.fromfile(root_dir + path_map[key], dtype=self.dtype)
+            # np_data_view = np.fromfile(root_dir + path_map[key], dtype=self.dtype)
             nframes = wf.getnframes()
             audio = wf.readframes(nframes)
             samplewidth = wf.getsampwidth()
             nsamples = nframes * 1
             channels = wf.getnchannels()
-            # np_data = np.frombuffer(audio, dtype=self.dtype)
+            np_data_view = np.frombuffer(audio, dtype=self.dtype).copy()
             # reduce volume
-            # audio_arr = np.zeros(np_data.size, dtype=self.dtype)
-            audio_arr = np.zeros(np_data_view.shape[0], dtype=self.dtype)
+            audio_arr = np.zeros(nsamples, dtype=self.dtype)
             audio_arr_view = audio_arr
             for i in range(audio_arr_view.shape[0]):
-                # print(f"audio_arr_view[{i}]: {audio_arr_view[i]}, audio_arr[{i}]: {audio_arr[i]}")
                 sample = <float> np_data_view[i]
-                # print("sample before multiplication:", sample)
                 sample = (sample * fgain) + .5
-                # if sample != 0:
-                #     print(sample)
                 audio_arr_view[i] = <short> sample
             print("ndim:", audio_arr.ndim, "shape:", audio_arr.shape)
             print("loaded", path_map[key], "nframes =", nframes, "nsamples =", nsamples, "samplewidth (in bytes) =", samplewidth, "channels =", channels)
             self.samples[key] = audio_arr
+
             files.append(audio_arr)
+            np.concatenate((np_files, audio_arr))
             keys.append(self.keyToAsciiBuffer(list(key)))
             start_end.append([pos, pos + audio_arr_view.shape[0]])
             pos = pos + audio_arr_view.shape[0]
-            # plt.plot(self.samples[key])
-            # plt.show()
-        print("self.samples = ", self.samples)
+            # self.visualize(audio_arr)
 
         # intialize sample playback positions
         self.pos = self.samples.copy()
@@ -134,33 +139,24 @@ cdef class Sampler:
         # print("output_buffer dtype:", self.output_buffer.dtype)
 
         # initialize sample array
-        print("files:", files)
         self.sample_arr = np.array(list(itertools.chain.from_iterable(files)), dtype=self.dtype)
+        # self.sample_arr = np_files
         self.sample_view = self.sample_arr
-        print("sample_arr:", self.sample_arr)
-        print("sample_view: ", self.sample_view)
+        # print("sample_arr:", self.sample_arr)
+        # print("sample_view: ", self.sample_view)
+        print("start_end:", start_end)
         self.sample_start_end_view = np.array(start_end, dtype=np.uint)
-        
+        print("sample_start_end:", self.sample_start_end_view[:])
         # initialize key array
         self.key_arr = np.array(keys, dtype=np.uint)
         self.key_view = self.key_arr
-        print("key_arr:", self.key_arr)
-        print("key_view:", self.key_view)
-        
-        # DEBUGGING
-        # for i in range(self.sample_view.shape[0]):
-        #     print(f"sample_view[{i}]:", self.sample_view[i])
-        #     print(f"key_view[{i}]:", self.key_view[i])
+        # print("key_arr:", self.key_arr)
+        # print("key_view:", self.key_view)
+
+        # self.visualize(self.sample_view)
+    
     def generate_key_press_array(self):
         return np.zeros(len(self.key_arr), dtype=np.int16)
-    def visualize(self, recording):
-        recording_L = recording[::2]
-        recording_R = recording[1::2]
-        figs, axs = plt.subplots(2, sharex=True, sharey=True)
-        figs.suptitle("Recording")
-        axs[0].plot(recording_L)
-        axs[1].plot(recording_R)
-        plt.show()
 
     def update(self, notes_pressed):
         """
@@ -237,7 +233,7 @@ cdef class Sampler:
             self.output_buffer_view[i] = 0
         # for every sound file
         for p in range(self.sample_start_end_view.shape[0]):
-            if keys_arr[p] == 1:
+            if keys_arr[p] == 1 and self.pos_view[p] < self.pos_view[p] + self.sample_start_end_view[p][1]: # if key down and sample isn't at end
                 sound_playing = True
                 for i in range(self.output_buffer_view.shape[0]):
                     sample_index = i + self.sample_start_end_view[p][0] + self.pos_view[p]
@@ -260,11 +256,6 @@ cdef class Sampler:
             if self.record_enabled:
                 self.recording.append(np.array(self.output_buffer, dtype=self.dtype))
         # """
-    
-    
-    
-    
-    
     def start(self):
         print(sd.query_devices())
         self.stream = sd.OutputStream()
@@ -279,31 +270,3 @@ cdef class Sampler:
             self.stream.write(recording)
         self.stream.stop()
         print("Sampler stopped.")
-    def start_sounddevice(self):
-        print(sd.query_devices())
-        sd.default.samplerate = 44100
-        sd.default.channels = 2
-        sd.default.dtype = 'int16'
-        wf = wave.open("note_R.wav", 'rb')
-        data = wf.readframes(wf.getnframes())
-        audio_arr = np.frombuffer(data, dtype=self.dtype)
-        # audio_arr.reshape(int(len(audio_arr)/2), 2)
-        L = audio_arr[::2]
-        R = audio_arr[1::2]
-        L_R = np.array((L.tolist(), R.tolist()), dtype=self.dtype)
-        L_R = np.reshape(L_R, (L_R[0].size, 2))
-        # L_R = np.array(L.tolist(), dtype=self.dtype)
-        print("L_R ndim:", L_R.ndim)
-        print("L_R shape:", L_R.shape)
-        print("L_R:", L_R)
-        self.stream = sd.OutputStream(channels=2) #NOTE: !IMPORTANT! output stream is expecting INTERLEAVED array
-        self.stream.start()
-        # for i in range(L_R.shape[0], 128):
-        self.stream.write(audio_arr)
-        self.stream.stop()
-        start_time = time.time()
-        # sd.play(L_R, blocking=True, samplerate=44100)
-        status = sd.wait()
-        end_time = time.time()
-        print(end_time - start_time)
-        self.visualize(audio_arr.tolist())
