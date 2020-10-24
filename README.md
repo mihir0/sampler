@@ -35,7 +35,7 @@ Since this module uses Cython to create a C-compiled build for efficient audio p
     sampler.close()
 ```
 
-#Future Enhancements
+# Future Enhancements
 My development is currently focused on supporting the lego-pi-ano project but this module can be used for many more purposes as well. Here are some of the enhancements I have in store:
 1. Supporting different file formats and bit-depth
 2. Adding a nice ADSR envelope that's fully customizable
